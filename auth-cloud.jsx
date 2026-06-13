@@ -133,6 +133,7 @@ function RootGate() {
   // load this user's data from the backend, seed localStorage, mount the app
   const bootstrap = async () => {
     setPhase("loading"); setError("");
+    window.__userEmail = (_auth && _auth.currentUser && _auth.currentUser.email) || null;
     try {
       const data = await cloudLoad();
       if (data) {

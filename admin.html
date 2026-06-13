@@ -37,6 +37,23 @@
   .muted{color:var(--dim);font-size:13.5px;line-height:1.6;margin:10px 0 18px}
   .err{color:#ff5b5b;font-size:13px;margin-top:12px}
   a.applink{color:var(--lime);font-size:12.5px}
+  tbody tr.clk{cursor:pointer}
+  tbody tr.clk:hover{background:var(--bg3)}
+  .chev{color:var(--mut);font-size:12px}
+  .back{background:none;border:none;color:var(--lime);font-size:13px;cursor:pointer;margin-bottom:14px;display:flex;align-items:center;gap:6px}
+  .uhead{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+  .uhead .avatar{width:52px;height:52px}
+  .uhead h2{font-family:'Archivo',sans-serif;font-size:22px}
+  .uhead small{color:var(--dim);font-size:13px}
+  .session{background:var(--bg2);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin-bottom:12px}
+  .session__top{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px;gap:10px}
+  .session__date{font-family:'Archivo',sans-serif;font-weight:700;font-size:14px}
+  .session__meta{font-size:12px;color:var(--dim)}
+  .ex{padding:9px 0;border-top:1px solid var(--line)}
+  .ex__name{font-weight:600;font-size:13.5px;margin-bottom:5px}
+  .sets{display:flex;flex-wrap:wrap;gap:6px}
+  .set{font-size:12px;background:var(--bg3);border:1px solid var(--line);border-radius:8px;padding:4px 9px;font-variant-numeric:tabular-nums}
+  .note{margin-top:8px;font-size:12.5px;color:var(--dim);font-style:italic}
 </style>
 </head>
 <body>
@@ -45,9 +62,13 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="config.jsx"></script>
+<script src="data.jsx"></script>
 <script>
 const app = document.getElementById('app');
+const exName = (id) => { try { const e = window.byId && window.byId(id); return e ? e.name : id; } catch(_) { return id; } };
 const fmtDate = (ts) => ts ? new Date(ts).toLocaleDateString(undefined,{year:'numeric',month:'short',day:'numeric'}) : '—';
+const fmtDateTime = (ts) => ts ? new Date(ts).toLocaleString(undefined,{month:'short',day:'numeric',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
+let CURRENT_USER = null;
 const esc = (s) => (s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
 firebase.initializeApp(GT_CONFIG.firebase);
@@ -89,6 +110,7 @@ function renderError(msg, user, allowSwitch){
 }
 
 function render(users, user){
+  CURRENT_USER = user;
   const totVol = users.reduce((t,u)=>t+(u.totalVolume||0),0);
   const totWk = users.reduce((t,u)=>t+(u.workouts||0),0);
   app.className='';
@@ -107,24 +129,68 @@ function render(users, user){
       <div class="card"><div class="k">Total volume</div><div class="v">${totVol.toLocaleString()}<span style="font-size:14px;color:var(--dim)"> kg</span></div></div>
     </div>
     <table>
-      <thead><tr><th>User</th><th class="num">Workouts</th><th class="num">Sets</th><th class="num">Volume (kg)</th><th>Last active</th><th>UID</th></tr></thead>
+      <thead><tr><th>User</th><th class="num">Workouts</th><th class="num">Sets</th><th class="num">Volume (kg)</th><th>Last active</th><th></th></tr></thead>
       <tbody>${users.map(u=>`
-        <tr>
+        <tr class="clk" data-uid="${esc(u.uid)}">
           <td><div class="user">
             ${u.picture?`<img class="avatar" src="${esc(u.picture)}" referrerpolicy="no-referrer"/>`:`<div class="avatar"></div>`}
-            <div class="nameblk"><b>${esc(u.name||'(no name)')}</b><small>${esc(u.email||'unknown')}</small></div>
+            <div class="nameblk"><b>${esc(u.name||'(no name)')}</b><small>${esc(u.email||u.uid)}</small></div>
           </div></td>
           <td class="num">${u.workouts||0}</td>
           <td class="num">${u.totalSets||0}</td>
           <td class="num">${(u.totalVolume||0).toLocaleString()}</td>
           <td>${fmtDate(u.lastActive)}</td>
-          <td class="uid">${esc(u.uid)}</td>
+          <td class="chev">View ›</td>
         </tr>`).join('')}
       </tbody>
     </table>
-    ${users.length?'':'<div class="muted" style="margin-top:16px">No users yet.</div>'}
+    ${users.length?'<div class="muted" style="margin-top:12px;font-size:12px">Click a user to see every workout they logged.</div>':'<div class="muted" style="margin-top:16px">No users yet.</div>'}
   </div>`;
   document.getElementById('out').onclick=()=>auth.signOut();
+  app.querySelectorAll('tr.clk').forEach(tr =>
+    tr.onclick = () => loadDetail(tr.getAttribute('data-uid'), users));
+}
+
+async function loadDetail(uid, users){
+  app.innerHTML = `<div class="wrap"><div class="muted">Loading workouts…</div></div>`;
+  const idToken = await CURRENT_USER.getIdToken();
+  const res = await fetch(`${GT_CONFIG.api}/api/admin/user?uid=${encodeURIComponent(uid)}`, { headers:{ Authorization:`Bearer ${idToken}` } });
+  if (!res.ok){ let m='Failed'; try{m=(await res.json()).error||m;}catch(e){} return renderError(m, CURRENT_USER); }
+  const { profile, state } = await res.json();
+  renderDetail(uid, profile||{}, state||{}, users);
+}
+
+function renderDetail(uid, profile, state, users){
+  const history = (state.history||[]).slice().sort((a,b)=>b.date-a.date);
+  const sessions = history.map(s=>{
+    let vol=0,sets=0;
+    (s.entries||[]).forEach(e=>(e.sets||[]).forEach(x=>{sets++;vol+=(x.reps||0)*(x.kg||0);}));
+    const exs = (s.entries||[]).map(e=>`
+      <div class="ex"><div class="ex__name">${esc(exName(e.exerciseId))}</div>
+        <div class="sets">${(e.sets||[]).map(x=>`<span class="set">${x.reps||0}${x.kg?(' × '+x.kg+'kg'):' reps'}</span>`).join('')}</div>
+      </div>`).join('');
+    return `<div class="session">
+      <div class="session__top"><span class="session__date">${esc(s.weekday||'')} · ${fmtDate(s.date)}</span>
+        <span class="session__meta">${(s.entries||[]).length} exercises · ${sets} sets · ${Math.round(vol).toLocaleString()} kg</span></div>
+      ${exs}
+      ${s.note?`<div class="note">“${esc(s.note)}”</div>`:''}
+    </div>`;
+  }).join('');
+  app.className='';
+  app.innerHTML = `<div class="wrap">
+    <button class="back" id="back">‹ All users</button>
+    <div class="uhead">
+      ${profile.picture?`<img class="avatar" src="${esc(profile.picture)}" referrerpolicy="no-referrer"/>`:`<div class="avatar"></div>`}
+      <div><h2>${esc(profile.name||'(no name)')}</h2><small>${esc(profile.email||'unknown')} · <span class="uid">${esc(uid)}</span></small></div>
+    </div>
+    <div class="cards">
+      <div class="card"><div class="k">Workouts</div><div class="v">${history.length}</div></div>
+      <div class="card"><div class="k">Last active</div><div class="v" style="font-size:18px">${fmtDateTime(history[0]&&history[0].date)}</div></div>
+      <div class="card"><div class="k">Bodyweight</div><div class="v" style="font-size:22px">${(state.settings&&state.settings.bodyweight)||'—'}<span style="font-size:13px;color:var(--dim)"> kg</span></div></div>
+    </div>
+    ${sessions||'<div class="muted">No workouts logged yet.</div>'}
+  </div>`;
+  document.getElementById('back').onclick=()=>render(users, CURRENT_USER);
 }
 
 auth.onAuthStateChanged(u => { if (u) loadUsers(u); else loginView(); });

@@ -16,4 +16,7 @@ window.GT_CONFIG = {
   // Backend Worker that holds the owner's GitHub token and saves each
   // Google-signed-in user's data to the owner's repo. Users never see a token.
   api: "https://gym-track-api.rudaw-a-the-gw.workers.dev",
+  // Shows the Admin button in Settings for this account only (the Worker
+  // enforces the real check server-side via ADMIN_EMAIL).
+  adminEmail: "rudaw.a.the.gw@gmail.com",
 };

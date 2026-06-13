@@ -430,6 +430,9 @@ function SettingsPanel({ store, setStore, setDraft, onClose }) {
       </div>
 
       <div className="dangerzone">
+        {window.GT_CONFIG && window.__userEmail && window.__userEmail === window.GT_CONFIG.adminEmail && (
+          <a className="btn btn--ghost" href="admin.html" style={{ textDecoration: 'none' }}>{lang === 'ku' ? 'داشبۆردی بەڕێوەبەر' : 'Admin dashboard'}</a>
+        )}
         {typeof window.__signOut === 'function' && (
           <button className="btn btn--outline" onClick={() => { if (confirm(lang === 'ku' ? 'دەرچوون؟ داتاکانت لەسەر GitHub دەمێننەوە.' : 'Sign out? Your data stays saved on GitHub.')) window.__signOut(); }}>{lang === 'ku' ? 'دەرچوون' : 'Sign out'}</button>
         )}

@@ -168,6 +168,20 @@ export default {
         return json(env, { users });
       }
 
+      // ----- admin: full data for one user (owner only) -----
+      if (url.pathname === "/api/admin/user") {
+        if (!env.ADMIN_EMAIL || user.email !== env.ADMIN_EMAIL) {
+          return json(env, { error: "Forbidden" }, 403);
+        }
+        const id = url.searchParams.get("uid");
+        if (!id) return json(env, { error: "Missing uid" }, 400);
+        const [state, profile] = await Promise.all([
+          ghReadJson(env, dataPath(env, id)),
+          ghReadJson(env, profilePath(id)),
+        ]);
+        return json(env, { uid: id, profile, state });
+      }
+
       // ----- per-user data -----
       if (url.pathname === "/api/data") {
         if (request.method === "GET") {
