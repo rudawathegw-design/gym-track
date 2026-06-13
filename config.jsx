@@ -23,7 +23,7 @@ window.GT_CONFIG = {
     appId: "REPLACE_APP_ID",
   },
   github: {
-    owner: "REPLACE_GITHUB_USERNAME", // repo owner
+    owner: "rudawathegw-design", // repo owner
     repo: "gym-track-data",            // repo that stores user data
     branch: "main",
     path: "data",                      // folder inside the repo
