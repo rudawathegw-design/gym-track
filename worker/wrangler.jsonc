@@ -11,6 +11,8 @@
     "GH_REPO": "gym-track-data",
     "GH_BRANCH": "main",
     "GH_PATH": "data",
-    "ALLOWED_ORIGIN": "https://rudawathegw-design.github.io"
+    "ALLOWED_ORIGIN": "https://rudawathegw-design.github.io",
+    // Only this Google account can open the admin dashboard / list all users.
+    "ADMIN_EMAIL": "rudaw.a.the.gw@gmail.com"
   }
 }

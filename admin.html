@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>IRONLOG — Admin</title>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800;900&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root{--bg:#0a0a0a;--bg2:#111;--bg3:#171717;--line:#262626;--line2:#323232;--text:#f6f6f4;--dim:#9b9b97;--mut:#5e5e5a;--lime:#c8ff00;}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#000;color:var(--text);font-family:'Hanken Grotesk',system-ui,sans-serif;-webkit-font-smoothing:antialiased;min-height:100vh}
+  .wrap{max-width:1100px;margin:0 auto;padding:24px 18px 60px}
+  header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:24px;flex-wrap:wrap}
+  .brand{display:flex;align-items:center;gap:12px}
+  .logo{width:42px;height:42px;border-radius:12px;background:var(--lime);display:grid;place-items:center}
+  h1{font-family:'Archivo',sans-serif;font-weight:900;letter-spacing:.12em;font-size:20px}
+  .sub{font-size:12px;color:var(--dim)}
+  .btn{font-family:'Archivo',sans-serif;font-weight:700;font-size:14px;border:none;border-radius:11px;padding:11px 16px;cursor:pointer}
+  .btn--g{background:#fff;color:#1f1f1f;display:flex;align-items:center;gap:8px}
+  .btn--ghost{background:var(--bg3);color:var(--text);border:1px solid var(--line2)}
+  .cards{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:22px}
+  .card{flex:1;min-width:150px;background:var(--bg2);border:1px solid var(--line);border-radius:16px;padding:16px 18px}
+  .card .k{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--mut)}
+  .card .v{font-family:'Archivo',sans-serif;font-weight:900;font-size:30px;margin-top:6px}
+  table{width:100%;border-collapse:collapse;background:var(--bg2);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+  th,td{text-align:left;padding:12px 14px;font-size:13.5px;border-bottom:1px solid var(--line)}
+  th{font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--mut);background:var(--bg3)}
+  td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+  tr:last-child td{border-bottom:none}
+  .user{display:flex;align-items:center;gap:10px}
+  .avatar{width:30px;height:30px;border-radius:50%;background:var(--bg4);object-fit:cover}
+  .nameblk b{font-weight:600}
+  .nameblk small{display:block;color:var(--dim);font-size:11.5px}
+  .uid{font-family:monospace;font-size:11px;color:var(--mut)}
+  .center{display:grid;place-items:center;min-height:70vh;text-align:center;padding:24px}
+  .center .box{max-width:380px}
+  .muted{color:var(--dim);font-size:13.5px;line-height:1.6;margin:10px 0 18px}
+  .err{color:#ff5b5b;font-size:13px;margin-top:12px}
+  a.applink{color:var(--lime);font-size:12.5px}
+</style>
+</head>
+<body>
+<div id="app" class="center"><div class="box"><div class="muted">Loading…</div></div></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="config.jsx"></script>
+<script>
+const app = document.getElementById('app');
+const fmtDate = (ts) => ts ? new Date(ts).toLocaleDateString(undefined,{year:'numeric',month:'short',day:'numeric'}) : '—';
+const esc = (s) => (s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+firebase.initializeApp(GT_CONFIG.firebase);
+const auth = firebase.auth();
+
+function loginView(msg){
+  app.className='center';
+  app.innerHTML = `<div class="box">
+    <div class="logo" style="margin:0 auto 14px">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0a0a0a" stroke-width="2.4" stroke-linecap="round"><path d="M3 12h2M19 12h2M7 9v6M17 9v6M9 12h6"/></svg></div>
+    <h1>IRONLOG ADMIN</h1>
+    <div class="muted">${msg||'Sign in with the owner account to view all users.'}</div>
+    <button class="btn btn--g" id="login" style="margin:0 auto">Continue with Google</button>
+    <div><a class="applink" href="index.html">← back to app</a></div>
+  </div>`;
+  document.getElementById('login').onclick = () =>
+    auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(e=>loginView(e.message));
+}
+
+async function loadUsers(user){
+  app.className=''; app.innerHTML = `<div class="wrap"><div class="muted">Loading users…</div></div>`;
+  const idToken = await user.getIdToken();
+  let res;
+  try { res = await fetch(`${GT_CONFIG.api}/api/admin/users`, { headers:{ Authorization:`Bearer ${idToken}` } }); }
+  catch(e){ return renderError('Network error: '+e.message, user); }
+  if (res.status === 403) return renderError('This account is not the admin. Sign in with the owner account.', user, true);
+  if (!res.ok) { let m='Request failed'; try{m=(await res.json()).error||m;}catch(e){} return renderError(m, user); }
+  const { users } = await res.json();
+  render(users, user);
+}
+
+function renderError(msg, user, allowSwitch){
+  app.className='center';
+  app.innerHTML = `<div class="box"><h1>IRONLOG ADMIN</h1><div class="err">${esc(msg)}</div>
+    <div style="margin-top:16px;display:flex;gap:8px;justify-content:center">
+      ${allowSwitch?'<button class="btn btn--ghost" id="switch">Switch account</button>':''}
+    </div></div>`;
+  const sw=document.getElementById('switch'); if(sw) sw.onclick=()=>auth.signOut();
+}
+
+function render(users, user){
+  const totVol = users.reduce((t,u)=>t+(u.totalVolume||0),0);
+  const totWk = users.reduce((t,u)=>t+(u.workouts||0),0);
+  app.className='';
+  app.innerHTML = `<div class="wrap">
+    <header>
+      <div class="brand"><div class="logo"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0a0a0a" stroke-width="2.4" stroke-linecap="round"><path d="M3 12h2M19 12h2M7 9v6M17 9v6M9 12h6"/></svg></div>
+        <div><h1>IRONLOG ADMIN</h1><div class="sub">${esc(user.email)}</div></div></div>
+      <div style="display:flex;gap:8px">
+        <a class="btn btn--ghost" href="index.html" style="text-decoration:none">Open app</a>
+        <button class="btn btn--ghost" id="out">Sign out</button>
+      </div>
+    </header>
+    <div class="cards">
+      <div class="card"><div class="k">Users</div><div class="v">${users.length}</div></div>
+      <div class="card"><div class="k">Total workouts</div><div class="v">${totWk}</div></div>
+      <div class="card"><div class="k">Total volume</div><div class="v">${totVol.toLocaleString()}<span style="font-size:14px;color:var(--dim)"> kg</span></div></div>
+    </div>
+    <table>
+      <thead><tr><th>User</th><th class="num">Workouts</th><th class="num">Sets</th><th class="num">Volume (kg)</th><th>Last active</th><th>UID</th></tr></thead>
+      <tbody>${users.map(u=>`
+        <tr>
+          <td><div class="user">
+            ${u.picture?`<img class="avatar" src="${esc(u.picture)}" referrerpolicy="no-referrer"/>`:`<div class="avatar"></div>`}
+            <div class="nameblk"><b>${esc(u.name||'(no name)')}</b><small>${esc(u.email||'unknown')}</small></div>
+          </div></td>
+          <td class="num">${u.workouts||0}</td>
+          <td class="num">${u.totalSets||0}</td>
+          <td class="num">${(u.totalVolume||0).toLocaleString()}</td>
+          <td>${fmtDate(u.lastActive)}</td>
+          <td class="uid">${esc(u.uid)}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>
+    ${users.length?'':'<div class="muted" style="margin-top:16px">No users yet.</div>'}
+  </div>`;
+  document.getElementById('out').onclick=()=>auth.signOut();
+}
+
+auth.onAuthStateChanged(u => { if (u) loadUsers(u); else loginView(); });
+</script>
+</body>
+</html>

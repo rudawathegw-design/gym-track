@@ -2,9 +2,10 @@
 // Lets Google-signed-in users save their gym data to the OWNER's GitHub repo.
 // The owner's GitHub token lives only here (as a secret); browsers never see it.
 //
-// Flow: the browser sends its Firebase ID token (Bearer). We verify it against
-// Google's public certs, derive the user's uid, then read/write
-// <GH_PATH>/<uid>.json in the owner's repo via the GitHub Contents API.
+// Routes:
+//   GET  /api/data         -> this user's data (data/<uid>.json)
+//   PUT  /api/data         -> save this user's data (+ profiles/<uid>.json)
+//   GET  /api/admin/users  -> owner only: every user's profile + summary stats
 
 import { importX509, jwtVerify } from "jose";
 
@@ -38,7 +39,7 @@ async function verifyIdToken(token, projectId) {
     audience: projectId,
   });
   if (!payload.sub) throw new Error("Token missing subject");
-  return payload; // { sub: uid, email, ... }
+  return payload; // { sub: uid, email, name, picture, ... }
 }
 
 // ---- GitHub Contents API ----
@@ -49,37 +50,59 @@ function ghHeaders(env) {
     "User-Agent": "gym-track-api",
   };
 }
-function ghUrl(env, uid) {
-  return `https://api.github.com/repos/${env.GH_OWNER}/${env.GH_REPO}/contents/${env.GH_PATH}/${uid}.json`;
+function ghFileUrl(env, path) {
+  return `https://api.github.com/repos/${env.GH_OWNER}/${env.GH_REPO}/contents/${path}`;
 }
 const b64encode = (str) => btoa(unescape(encodeURIComponent(str)));
 const b64decode = (b64) => decodeURIComponent(escape(atob(b64)));
 
-async function ghLoad(env, uid) {
-  const res = await fetch(`${ghUrl(env, uid)}?ref=${env.GH_BRANCH}`, { headers: ghHeaders(env) });
+async function ghGet(env, path) {
+  const res = await fetch(`${ghFileUrl(env, path)}?ref=${env.GH_BRANCH}`, { headers: ghHeaders(env) });
   if (res.status === 404) return null;
-  if (!res.ok) throw new Error(`GitHub load ${res.status}`);
-  const json = await res.json();
-  return JSON.parse(b64decode(json.content));
+  if (!res.ok) throw new Error(`GitHub GET ${path} ${res.status}`);
+  return res.json();
 }
-
-async function ghSave(env, uid, state) {
-  // fetch current sha (if the file exists) so we can update it
-  let sha = null;
-  const cur = await fetch(`${ghUrl(env, uid)}?ref=${env.GH_BRANCH}`, { headers: ghHeaders(env) });
-  if (cur.ok) sha = (await cur.json()).sha;
+async function ghReadJson(env, path) {
+  const f = await ghGet(env, path);
+  return f ? JSON.parse(b64decode(f.content)) : null;
+}
+async function ghPut(env, path, obj, message) {
+  const cur = await ghGet(env, path);
   const body = {
-    message: `gym-track: update ${uid}`,
-    content: b64encode(JSON.stringify(state, null, 2)),
+    message: message || `gym-track: update ${path}`,
+    content: b64encode(JSON.stringify(obj, null, 2)),
     branch: env.GH_BRANCH,
   };
-  if (sha) body.sha = sha;
-  const res = await fetch(ghUrl(env, uid), {
+  if (cur && cur.sha) body.sha = cur.sha;
+  const res = await fetch(ghFileUrl(env, path), {
     method: "PUT",
     headers: { ...ghHeaders(env), "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  if (!res.ok) throw new Error(`GitHub save ${res.status}: ${await res.text()}`);
+  if (!res.ok) throw new Error(`GitHub PUT ${path} ${res.status}: ${await res.text()}`);
+}
+async function ghList(env, dir) {
+  const res = await fetch(`${ghFileUrl(env, dir)}?ref=${env.GH_BRANCH}`, { headers: ghHeaders(env) });
+  if (res.status === 404) return [];
+  if (!res.ok) throw new Error(`GitHub list ${dir} ${res.status}`);
+  return res.json();
+}
+
+const dataPath = (env, uid) => `${env.GH_PATH}/${uid}.json`;
+const profilePath = (uid) => `profiles/${uid}.json`;
+
+// ---- summary stats from a user's state ----
+function summarize(state) {
+  const history = (state && state.history) || [];
+  let totalVolume = 0, totalSets = 0, last = 0;
+  history.forEach((s) => {
+    if (s.date > last) last = s.date;
+    (s.entries || []).forEach((e) => (e.sets || []).forEach((set) => {
+      totalSets++;
+      totalVolume += (set.reps || 0) * (set.kg || 0);
+    }));
+  });
+  return { workouts: history.length, totalSets, totalVolume: Math.round(totalVolume), lastActive: last || null };
 }
 
 // ---- CORS ----
@@ -105,9 +128,8 @@ export default {
       return new Response(null, { status: 204, headers: corsHeaders(env) });
     }
     const url = new URL(request.url);
-    if (url.pathname !== "/api/data") return json(env, { error: "Not found" }, 404);
 
-    // authenticate
+    // authenticate (all routes require a valid Google sign-in)
     const auth = request.headers.get("Authorization") || "";
     const token = auth.startsWith("Bearer ") ? auth.slice(7) : "";
     if (!token) return json(env, { error: "Missing token" }, 401);
@@ -120,18 +142,57 @@ export default {
     const uid = user.sub;
 
     try {
-      if (request.method === "GET") {
-        const data = await ghLoad(env, uid);
-        return json(env, { data });
+      // ----- admin: list all users (owner only) -----
+      if (url.pathname === "/api/admin/users") {
+        if (!env.ADMIN_EMAIL || user.email !== env.ADMIN_EMAIL) {
+          return json(env, { error: "Forbidden" }, 403);
+        }
+        const files = await ghList(env, env.GH_PATH);
+        const users = [];
+        for (const f of files) {
+          if (!f.name.endsWith(".json")) continue;
+          const id = f.name.replace(/\.json$/, "");
+          const [state, profile] = await Promise.all([
+            ghReadJson(env, dataPath(env, id)),
+            ghReadJson(env, profilePath(id)),
+          ]);
+          users.push({
+            uid: id,
+            email: profile?.email || null,
+            name: profile?.name || null,
+            picture: profile?.picture || null,
+            ...summarize(state),
+          });
+        }
+        users.sort((a, b) => (b.lastActive || 0) - (a.lastActive || 0));
+        return json(env, { users });
       }
-      if (request.method === "PUT") {
-        const state = await request.json();
-        await ghSave(env, uid, state);
-        return json(env, { ok: true });
+
+      // ----- per-user data -----
+      if (url.pathname === "/api/data") {
+        if (request.method === "GET") {
+          const data = await ghReadJson(env, dataPath(env, uid));
+          return json(env, { data });
+        }
+        if (request.method === "PUT") {
+          const state = await request.json();
+          await ghPut(env, dataPath(env, uid), state, `gym-track: data ${uid}`);
+          // stamp who this uid is, so the owner can identify users
+          await ghPut(env, profilePath(uid), {
+            uid,
+            email: user.email || null,
+            name: user.name || null,
+            picture: user.picture || null,
+            updatedAt: Date.now(),
+          }, `gym-track: profile ${uid}`);
+          return json(env, { ok: true });
+        }
+        return json(env, { error: "Method not allowed" }, 405);
       }
+
+      return json(env, { error: "Not found" }, 404);
     } catch (e) {
       return json(env, { error: e.message }, 502);
     }
-    return json(env, { error: "Method not allowed" }, 405);
   },
 };
