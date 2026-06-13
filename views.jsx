@@ -47,9 +47,9 @@ function TodayView({ store, draft, tKey, today, onStart, updateSet, addSet, remo
             </>
           ) : (
             <>
-              <h1 className="hero__title">{t('rest_day_title')}</h1>
-              <div className="hero__meta">{t('rest_day_desc', { day: tdayFull(tKey) })}</div>
-              <button className="btn btn--primary btn--xl" onClick={onAddExercise}><IconBolt /> {t('start_a_workout')}</button>
+              <h1 className="hero__title">{t('start_workout')}</h1>
+              <div className="hero__meta">{((store.settings && store.settings.lang) === 'ku') ? 'هیچ مەشقێک نییە. مەشقێک زیاد بکە بۆ دەستپێکردن.' : 'Nothing here yet. Add an exercise to begin.'}</div>
+              <button className="btn btn--primary btn--xl" onClick={onAddExercise}><IconBolt /> {t('add_an_exercise')}</button>
             </>
           )}
         </div>
@@ -430,13 +430,8 @@ function SettingsPanel({ store, setStore, setDraft, onClose }) {
       </div>
 
       <div className="dangerzone">
-        {store.history.some((s) => String(s.id).startsWith('seed_')) && (
-          <button className="btn btn--ghost" onClick={() => { if (confirm(lang === 'ku' ? 'داتای نموونە بسڕەوە؟ تۆمارەکانی خۆت دەمێننەوە.' : 'Remove sample data? Your own workouts are kept.')) { setStore({ ...store, history: store.history.filter((s) => !String(s.id).startsWith('seed_')), settings: { ...store.settings, sampleData: false } }); onClose(); } }}>{lang === 'ku' ? 'داتای نموونە بسڕەوە' : 'Remove sample data'}</button>
-        )}
-        <button className="btn btn--ghost" onClick={() => { if (confirm(t('confirm_reset'))) { setDraft(null); setStore(sampleState()); onClose(); } }}>{lang === 'ku' ? 'بارکردنی داتای نموونە' : 'Load sample data'}</button>
-        <button className="btn btn--danger" onClick={() => { if (confirm(t('confirm_clear'))) { setStore({ ...store, history: [] }); setDraft(null); onClose(); } }}>{t('clear_history')}</button>
         {typeof window.__signOut === 'function' && (
-          <button className="btn btn--outline" onClick={() => { if (confirm('Sign out? Your data stays saved on GitHub.')) window.__signOut(); }}>Sign out</button>
+          <button className="btn btn--outline" onClick={() => { if (confirm(lang === 'ku' ? 'دەرچوون؟ داتاکانت لەسەر GitHub دەمێننەوە.' : 'Sign out? Your data stays saved on GitHub.')) window.__signOut(); }}>{lang === 'ku' ? 'دەرچوون' : 'Sign out'}</button>
         )}
       </div>
       <div className="settings__foot">{t('sample_footer')}</div>

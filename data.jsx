@@ -294,28 +294,23 @@ function seedHistory() {
   return out.sort((a, b) => a.date - b.date);
 }
 
-// New users start clean: default weekly plan, but NO workout history.
+// New users start completely empty: no planned days, no history.
+function emptyPlan() {
+  const p = {};
+  DAYS.forEach((d) => { p[d] = []; });
+  return p;
+}
 function defaultState() {
   return {
     version: 1,
-    plan: JSON.parse(JSON.stringify(DEFAULT_PLAN)),
+    plan: emptyPlan(),
     history: [],
     settings: { unit: 'kg', bodyweight: 75, sampleData: false, lang: 'en' },
-  };
-}
-
-// Demo state with seeded sample history (used by "Load sample data").
-function sampleState() {
-  return {
-    version: 1,
-    plan: JSON.parse(JSON.stringify(DEFAULT_PLAN)),
-    history: seedHistory(),
-    settings: { unit: 'kg', bodyweight: 75, sampleData: true, lang: 'en' },
   };
 }
 
 Object.assign(window, {
   GROUPS, EXERCISES, byId, DEFAULT_PLAN, DAYS, DAY_FULL,
   epley, bestSet, setsVolume, sessionVolume, exerciseSeries, prFor,
-  seedHistory, defaultState, sampleState,
+  defaultState,
 });
