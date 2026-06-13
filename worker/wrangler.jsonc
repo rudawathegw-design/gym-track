@@ -1,0 +1,16 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "gym-track-api",
+  "main": "src/index.js",
+  "compatibility_date": "2025-06-01",
+  "observability": { "enabled": true },
+  "vars": {
+    // GITHUB_TOKEN is set as a SECRET (wrangler secret put), not here.
+    "FIREBASE_PROJECT_ID": "gym-track-59355-4dc9f",
+    "GH_OWNER": "rudawathegw-design",
+    "GH_REPO": "gym-track-data",
+    "GH_BRANCH": "main",
+    "GH_PATH": "data",
+    "ALLOWED_ORIGIN": "https://rudawathegw-design.github.io"
+  }
+}

@@ -1,12 +1,11 @@
-// auth-cloud.jsx — Google login (Firebase) + per-user data saved on GitHub.
-// Wraps <App/> in a login gate and syncs localStorage['gymtrack_v1'] to a
-// GitHub repo as data/<uid>.json (committed + pushed via the Contents API).
+// auth-cloud.jsx — Google login (Firebase) + per-user data saved on the OWNER's
+// GitHub repo via a backend Worker. Users only sign in with Google; the GitHub
+// token lives server-side in the Worker and is never exposed to the browser.
+// Wraps <App/> and syncs localStorage['gymtrack_v1'] to GET/PUT <api>/api/data.
 
 const { useState: aUseState, useEffect: aUseEffect, useRef: aUseRef } = React;
 
-// ---------- unicode-safe base64 ----------
-const b64encode = (str) => btoa(unescape(encodeURIComponent(str)));
-const b64decode = (b64) => decodeURIComponent(escape(atob(b64)));
+const STORE_KEY = "gymtrack_v1";
 
 // ---------- Firebase ----------
 let _auth = null;
@@ -18,45 +17,31 @@ function initFirebase() {
   return _auth;
 }
 
-// ---------- GitHub data store ----------
-const GH_TOKEN_KEY = "gt_gh_token";
-const STORE_KEY = "gymtrack_v1";
+// ---------- backend (Cloudflare Worker) ----------
+function apiBase() { return (window.GT_CONFIG && window.GT_CONFIG.api) || ""; }
 
-function ghCfg() { return (window.GT_CONFIG && window.GT_CONFIG.github) || {}; }
-function ghToken() { return localStorage.getItem(GH_TOKEN_KEY) || ""; }
-function ghFileUrl(uid) {
-  const { owner, repo, path } = ghCfg();
-  return `https://api.github.com/repos/${owner}/${repo}/contents/${path}/${uid}.json`;
-}
-
-async function cloudLoad(uid) {
-  const { branch } = ghCfg();
-  const res = await fetch(`${ghFileUrl(uid)}?ref=${branch}`, {
-    headers: { Authorization: `token ${ghToken()}`, Accept: "application/vnd.github+json" },
+async function authedFetch(method, body) {
+  const user = _auth && _auth.currentUser;
+  if (!user) throw new Error("Not signed in");
+  const idToken = await user.getIdToken();         // auto-refreshes
+  const res = await fetch(`${apiBase()}/api/data`, {
+    method,
+    headers: {
+      Authorization: `Bearer ${idToken}`,
+      ...(body ? { "Content-Type": "application/json" } : {}),
+    },
+    body: body ? JSON.stringify(body) : undefined,
   });
-  if (res.status === 404) return { data: null, sha: null };  // first time
-  if (!res.ok) throw new Error(`GitHub load failed (${res.status})`);
-  const json = await res.json();
-  return { data: JSON.parse(b64decode(json.content)), sha: json.sha };
+  if (!res.ok) {
+    let msg = `Request failed (${res.status})`;
+    try { msg = (await res.json()).error || msg; } catch (e) {}
+    throw new Error(msg);
+  }
+  return res.json();
 }
 
-async function cloudSave(uid, state, sha) {
-  const { branch } = ghCfg();
-  const body = {
-    message: `gym-track: update data for ${uid}`,
-    content: b64encode(JSON.stringify(state, null, 2)),
-    branch,
-  };
-  if (sha) body.sha = sha;
-  const res = await fetch(ghFileUrl(uid), {
-    method: "PUT",
-    headers: { Authorization: `token ${ghToken()}`, Accept: "application/vnd.github+json" },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) throw new Error(`GitHub save failed (${res.status})`);
-  const json = await res.json();
-  return json.content.sha; // new sha for the next write
-}
+const cloudLoad = () => authedFetch("GET").then((r) => r.data); // null if first time
+const cloudSave = (state) => authedFetch("PUT", state);
 
 // ---------- styles for the gate ----------
 const GATE_CSS = `
@@ -67,16 +52,7 @@ const GATE_CSS = `
 .gate__sub{font-size:13px;color:#9b9b97;margin:6px 0 22px;line-height:1.5}
 .gate__btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;background:#fff;color:#1f1f1f;font-family:'Archivo',sans-serif;font-weight:700;font-size:15px;border-radius:13px;padding:13px;border:none;cursor:pointer}
 .gate__btn:active{filter:brightness(.96)}
-.gate__btn--lime{background:#c8ff00;color:#0a0a0a;margin-top:10px}
-.gate__btn--ghost{background:#1d1d1d;color:#f6f6f4;border:1px solid #323232}
-.gate__input{width:100%;background:#0a0a0a;border:1px solid #323232;border-radius:11px;color:#f6f6f4;font-size:13px;padding:12px;outline:none;margin-bottom:10px;font-family:monospace}
-.gate__input:focus{border-color:#c8ff00}
 .gate__err{color:#ff5b5b;font-size:12.5px;margin-top:12px}
-.gate__help{font-size:11px;color:#5e5e5a;margin-top:14px;line-height:1.5}
-.gate__help a{color:#c8ff00}
-.gate__user{display:flex;align-items:center;gap:10px;justify-content:center;margin-bottom:18px}
-.gate__avatar{width:34px;height:34px;border-radius:50%}
-.gate__email{font-size:13px;color:#9b9b97}
 /* sync badge over the app */
 .synbadge{position:fixed;top:10px;left:50%;transform:translateX(-50%);z-index:90;background:rgba(17,17,17,.95);border:1px solid #323232;color:#9b9b97;font-size:11px;font-weight:600;padding:6px 12px;border-radius:20px;display:flex;align-items:center;gap:7px;pointer-events:none;transition:opacity .3s}
 .synbadge__dot{width:7px;height:7px;border-radius:50%;background:#c8ff00}
@@ -94,7 +70,6 @@ function GoogleIcon() {
   );
 }
 
-// ---------- login screen ----------
 function LoginScreen({ onGoogle, error }) {
   return (
     <div className="gate">
@@ -105,35 +80,9 @@ function LoginScreen({ onGoogle, error }) {
           </svg>
         </div>
         <div className="gate__title">IRONLOG</div>
-        <div className="gate__sub">Sign in to sync your workouts. Your data is saved to your GitHub repo.</div>
+        <div className="gate__sub">Sign in with Google to track your workouts. Your data syncs automatically.</div>
         <button className="gate__btn" onClick={onGoogle}><GoogleIcon /> Continue with Google</button>
         {error && <div className="gate__err">{error}</div>}
-      </div>
-    </div>
-  );
-}
-
-// ---------- GitHub token setup ----------
-function TokenSetup({ user, onSave, onSignOut, error }) {
-  const [val, setVal] = aUseState("");
-  const { owner, repo } = ghCfg();
-  return (
-    <div className="gate">
-      <div className="gate__card">
-        <div className="gate__user">
-          {user.photoURL && <img className="gate__avatar" src={user.photoURL} alt="" />}
-          <span className="gate__email">{user.email}</span>
-        </div>
-        <div className="gate__title" style={{ fontSize: 18 }}>CONNECT GITHUB</div>
-        <div className="gate__sub">Paste a GitHub token with <b>Contents</b> read/write access to <b>{owner}/{repo}</b>. Stored only in this browser.</div>
-        <input className="gate__input" type="password" placeholder="ghp_… or github_pat_…" value={val} onChange={(e) => setVal(e.target.value)} />
-        <button className="gate__btn gate__btn--lime" onClick={() => onSave(val.trim())} disabled={!val.trim()}>Save & continue</button>
-        <button className="gate__btn gate__btn--ghost" style={{ marginTop: 10 }} onClick={onSignOut}>Sign out</button>
-        {error && <div className="gate__err">{error}</div>}
-        <div className="gate__help">
-          Create one at <a href="https://github.com/settings/tokens?type=beta" target="_blank" rel="noopener">github.com/settings/tokens</a> →
-          Fine-grained token → Repository access: only <b>{repo}</b> → Permissions → Contents: Read and write.
-        </div>
       </div>
     </div>
   );
@@ -148,11 +97,10 @@ function Loading({ msg }) {
   );
 }
 
-// ---------- sync badge ----------
 function SyncBadge({ status }) {
   if (!status) return null;
   const err = status === "error";
-  const label = err ? "Sync failed — retrying" : status === "saving" ? "Saving to GitHub…" : "Synced";
+  const label = err ? "Sync failed — retrying" : status === "saving" ? "Saving…" : "Synced";
   return (
     <div className={"synbadge" + (err ? " synbadge--err" : "")} style={{ opacity: status === "saved" ? 0 : 1 }}>
       <span className="synbadge__dot" />{label}
@@ -162,65 +110,53 @@ function SyncBadge({ status }) {
 
 // ============================================================ ROOT GATE
 function RootGate() {
-  const [phase, setPhase] = aUseState("init"); // init | login | token | loading | ready
-  const [user, setUser] = aUseState(null);
+  const [phase, setPhase] = aUseState("init"); // init | login | loading | ready
   const [error, setError] = aUseState("");
   const [syncStatus, setSyncStatus] = aUseState(null);
-  const shaRef = aUseRef(null);
   const saveTimer = aUseRef(null);
 
-  // inject styles once
   aUseEffect(() => {
     if (document.getElementById("gate-css")) return;
     const s = document.createElement("style"); s.id = "gate-css"; s.textContent = GATE_CSS;
     document.head.appendChild(s);
   }, []);
 
-  // watch auth state
   aUseEffect(() => {
     const auth = initFirebase();
     if (!auth) { setError("Firebase not configured — edit config.jsx"); setPhase("login"); return; }
     return auth.onAuthStateChanged((u) => {
-      if (!u) { setUser(null); setPhase("login"); return; }
-      setUser(u);
-      if (!ghToken()) { setPhase("token"); return; }
-      bootstrap(u);
+      if (!u) { setPhase("login"); return; }
+      bootstrap();
     });
   }, []);
 
-  // load cloud data, seed localStorage, then mount the app
-  const bootstrap = async (u) => {
+  // load this user's data from the backend, seed localStorage, mount the app
+  const bootstrap = async () => {
     setPhase("loading"); setError("");
     try {
-      const { data, sha } = await cloudLoad(u.uid);
-      shaRef.current = sha;
+      const data = await cloudLoad();
       if (data) {
         localStorage.setItem(STORE_KEY, JSON.stringify(data));
       } else {
-        // first login on this account: push whatever is local (or default) up
         const local = localStorage.getItem(STORE_KEY);
-        if (local) shaRef.current = await cloudSave(u.uid, JSON.parse(local), null);
+        if (local) await cloudSave(JSON.parse(local)); // first login: push local up
       }
-      installCloudSave(u.uid);
+      installCloudSave();
       setPhase("ready");
     } catch (e) {
-      setError(e.message + " — check the token's repo permissions.");
-      setPhase("token");
+      setError(e.message);
+      setPhase("login");
     }
   };
 
-  // expose a debounced cloud-saver that useStore() calls on every change
-  const installCloudSave = (uid) => {
+  // debounced saver that useStore() calls on every change
+  const installCloudSave = () => {
     window.__cloudSave = (state) => {
       clearTimeout(saveTimer.current);
       setSyncStatus("saving");
       saveTimer.current = setTimeout(async () => {
-        try {
-          shaRef.current = await cloudSave(uid, state, shaRef.current);
-          setSyncStatus("saved");
-        } catch (e) {
-          setSyncStatus("error");
-        }
+        try { await cloudSave(state); setSyncStatus("saved"); }
+        catch (e) { setSyncStatus("error"); }
       }, 1500);
     };
   };
@@ -233,23 +169,16 @@ function RootGate() {
     } catch (e) { setError(e.message); }
   };
 
-  const saveToken = (tok) => {
-    localStorage.setItem(GH_TOKEN_KEY, tok);
-    if (user) bootstrap(user);
-  };
-
   const signOut = async () => {
     window.__cloudSave = null;
-    localStorage.removeItem(GH_TOKEN_KEY);
     localStorage.removeItem(STORE_KEY);
     const auth = initFirebase();
     if (auth) await auth.signOut();
   };
-  window.__signOut = signOut; // let settings panel reach it
+  window.__signOut = signOut;
 
   if (phase === "login" || phase === "init") return <LoginScreen onGoogle={signInGoogle} error={error} />;
-  if (phase === "token") return <TokenSetup user={user} onSave={saveToken} onSignOut={signOut} error={error} />;
-  if (phase === "loading") return <Loading msg="Loading your data from GitHub…" />;
+  if (phase === "loading") return <Loading msg="Loading your workouts…" />;
   return (
     <React.Fragment>
       <SyncBadge status={syncStatus} />

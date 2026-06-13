@@ -2,3 +2,7 @@
 *.log
 .DS_Store
 Thumbs.db
+node_modules/
+worker/node_modules/
+worker/.wrangler/
+firebase-debug.log
