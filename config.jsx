@@ -17,10 +17,10 @@
 // ----------------------------------------------------------------------------
 window.GT_CONFIG = {
   firebase: {
-    apiKey: "REPLACE_FIREBASE_API_KEY",
-    authDomain: "REPLACE_PROJECT.firebaseapp.com",
-    projectId: "REPLACE_PROJECT",
-    appId: "REPLACE_APP_ID",
+    apiKey: "AIzaSyAr__aXp-7BHxSzY6cW7O8amPb6US9C6lE",
+    authDomain: "gym-track-59355-4dc9f.firebaseapp.com",
+    projectId: "gym-track-59355-4dc9f",
+    appId: "1:1081368853242:web:a64c6ce66b87d4b9d3a743",
   },
   github: {
     owner: "rudawathegw-design", // repo owner
