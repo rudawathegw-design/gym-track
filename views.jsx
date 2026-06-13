@@ -430,7 +430,10 @@ function SettingsPanel({ store, setStore, setDraft, onClose }) {
       </div>
 
       <div className="dangerzone">
-        <button className="btn btn--ghost" onClick={() => { if (confirm(t('confirm_reset'))) { setDraft(null); setStore(defaultState()); onClose(); } }}>{t('reset_sample')}</button>
+        {store.history.some((s) => String(s.id).startsWith('seed_')) && (
+          <button className="btn btn--ghost" onClick={() => { if (confirm(lang === 'ku' ? 'داتای نموونە بسڕەوە؟ تۆمارەکانی خۆت دەمێننەوە.' : 'Remove sample data? Your own workouts are kept.')) { setStore({ ...store, history: store.history.filter((s) => !String(s.id).startsWith('seed_')), settings: { ...store.settings, sampleData: false } }); onClose(); } }}>{lang === 'ku' ? 'داتای نموونە بسڕەوە' : 'Remove sample data'}</button>
+        )}
+        <button className="btn btn--ghost" onClick={() => { if (confirm(t('confirm_reset'))) { setDraft(null); setStore(sampleState()); onClose(); } }}>{lang === 'ku' ? 'بارکردنی داتای نموونە' : 'Load sample data'}</button>
         <button className="btn btn--danger" onClick={() => { if (confirm(t('confirm_clear'))) { setStore({ ...store, history: [] }); setDraft(null); onClose(); } }}>{t('clear_history')}</button>
         {typeof window.__signOut === 'function' && (
           <button className="btn btn--outline" onClick={() => { if (confirm('Sign out? Your data stays saved on GitHub.')) window.__signOut(); }}>Sign out</button>
