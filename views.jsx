@@ -13,7 +13,7 @@ function topSetText(entry) {
 }
 
 // ===================================================== TODAY
-function TodayView({ store, draft, tKey, today, onStart, updateSet, addSet, removeSet, onFinish, onAddExercise, onRemoveExercise, openDetail, setNote }) {
+function TodayView({ store, draft, tKey, today, onStart, updateSet, addSet, removeSet, onFinish, onAddExercise, onRemoveExercise, onToggleExDone, openDetail, setNote }) {
   const planned = store.plan[tKey] || [];
   const active = draft && draft.order && draft.order.length > 0;
 
@@ -67,8 +67,14 @@ function TodayView({ store, draft, tKey, today, onStart, updateSet, addSet, remo
     );
   }
 
-  let doneSets = 0, totalSets = 0, vol = 0;
-  draft.order.forEach((id) => (draft.entries[id] || []).forEach((s) => { totalSets++; if (s.done) { doneSets++; vol += (s.reps || 0) * (s.kg || 0); } }));
+  const ku = (store.settings && store.settings.lang) === 'ku';
+  let doneSets = 0, totalSets = 0, vol = 0, exDoneCount = 0;
+  draft.order.forEach((id) => {
+    const arr = draft.entries[id] || [];
+    arr.forEach((s) => { totalSets++; if (s.done) { doneSets++; vol += (s.reps || 0) * (s.kg || 0); } });
+    if (arr.length > 0 && arr.every((s) => s.done)) exDoneCount++;
+  });
+  const allExDone = draft.order.length > 0 && exDoneCount === draft.order.length;
 
   return (
     <div className="pad pad--workout">
@@ -78,11 +84,11 @@ function TodayView({ store, draft, tKey, today, onStart, updateSet, addSet, remo
           <div className="wk-head__sub">{tdayFull(tKey)}</div>
         </div>
         <div className="wk-head__stats">
-          <div><b>{doneSets}/{totalSets}</b><span>{t('sets')}</span></div>
+          <div><b>{exDoneCount}/{draft.order.length}</b><span>{ku ? 'مەشق' : 'EXERCISES'}</span></div>
           <div><b>{H.round(vol)}</b><span>{t('kg_vol')}</span></div>
         </div>
       </div>
-      <div className="wk-progress"><div className="wk-progress__bar" style={{ width: `${totalSets ? (doneSets / totalSets) * 100 : 0}%` }} /></div>
+      <div className="wk-progress"><div className="wk-progress__bar" style={{ width: `${draft.order.length ? (exDoneCount / draft.order.length) * 100 : 0}%` }} /></div>
 
       {draft.order.map((id) => {
         const ex = byId(id);
@@ -92,6 +98,7 @@ function TodayView({ store, draft, tKey, today, onStart, updateSet, addSet, remo
           <ExerciseLogCard key={id} ex={ex} sets={draft.entries[id] || []} prevEntry={prev} pr={pr}
             onSet={(i, s) => updateSet(id, i, s)} onAdd={() => addSet(id)}
             onRemoveSet={(i) => removeSet(id, i)} onRemoveEx={() => onRemoveExercise(id)}
+            onToggleDone={() => onToggleExDone(id)}
             openDetail={() => openDetail(ex)} />
         );
       })}
@@ -103,17 +110,24 @@ function TodayView({ store, draft, tKey, today, onStart, updateSet, addSet, remo
       </label>
 
       <div className="finishbar">
-        <div className="finishbar__info"><b>{H.round(vol)}kg</b> · {doneSets}/{totalSets} {t('sets')}</div>
-        <button className="btn btn--primary" onClick={onFinish}><IconCheck /> {t('finish_save')}</button>
+        <div className="finishbar__info"><b>{exDoneCount}/{draft.order.length}</b> {ku ? 'تەواو' : 'done'}</div>
+        <button className="btn btn--primary" onClick={onFinish} disabled={!allExDone}
+          style={!allExDone ? { opacity: .45, filter: 'grayscale(.4)' } : null}>
+          <IconCheck /> {allExDone ? (ku ? 'تەواوکردن' : 'Finish') : (ku ? 'هەموو مەشقەکان تەواو بکە' : 'Check off all exercises')}
+        </button>
       </div>
     </div>
   );
 }
 
-function ExerciseLogCard({ ex, sets, prevEntry, pr, onSet, onAdd, onRemoveSet, onRemoveEx, openDetail }) {
+function ExerciseLogCard({ ex, sets, prevEntry, pr, onSet, onAdd, onRemoveSet, onRemoveEx, onToggleDone, openDetail }) {
   const isTime = ex.track === 'time';
+  const isCardio = ex.track === 'cardio';
+  const isBW = ex.track === 'bodyweight';
+  const colLabel = isCardio ? (((window.__lang) === 'ku') ? 'خولەک' : 'MIN') : isTime ? t('col_time') : isBW ? (((window.__lang) === 'ku') ? 'دووبارە' : 'REPS') : t('col_repskg');
+  const allDone = sets.length > 0 && sets.every((s) => s.done);
   return (
-    <div className="logcard">
+    <div className={'logcard' + (allDone ? ' logcard--done' : '')}>
       <div className="logcard__head">
         <button className="logcard__id" onClick={openDetail}>
           <ExerciseAvatar ex={ex} size={46} />
@@ -122,10 +136,13 @@ function ExerciseLogCard({ ex, sets, prevEntry, pr, onSet, onAdd, onRemoveSet, o
             <div className="logcard__sub">{topSetText(prevEntry) ? `${t('last_prefix')} ${topSetText(prevEntry)}` : muscleText(ex)}</div>
           </div>
         </button>
+        <button className={'logcard__done' + (allDone ? ' is-on' : '')} onClick={onToggleDone} title="Mark exercise done" aria-label="Mark exercise done">
+          {allDone ? <IconCheck small /> : ''}
+        </button>
         <button className="logcard__del" onClick={onRemoveEx} aria-label="Remove">×</button>
       </div>
       <div className="logcard__cols">
-        <span>{t('col_set')}</span><span>{isTime ? t('col_time') : t('col_repskg')}</span><span></span>
+        <span>{t('col_set')}</span><span>{colLabel}</span><span></span>
       </div>
       {sets.map((s, i) => {
         const e1 = epley(s.kg || 0, s.reps || 0);

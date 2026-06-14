@@ -46,19 +46,24 @@ function NumberStepper({ value, onChange, step = 1, min = 0, suffix }) {
 function SetRow({ idx, set, track, onChange, onRemove, prevText, isPR }) {
   const isBW = track === 'bodyweight';
   const isTime = track === 'time';
+  const isCardio = track === 'cardio';
   return (
     <div className={'setrow' + (set.done ? ' setrow--done' : '')}>
       <button className="setrow__no" onClick={() => onChange({ ...set, done: !set.done })} title="Mark set done">
         {set.done ? <Check /> : idx + 1}
       </button>
       <div className="setrow__fields">
-        {isTime ? (
+        {isCardio ? (
+          <Field label="min" value={set.reps} onChange={(v) => onChange({ ...set, reps: v, kg: 0 })} step={5} />
+        ) : isTime ? (
           <Field label="sec" value={set.reps} onChange={(v) => onChange({ ...set, reps: v, kg: 0 })} step={5} />
+        ) : isBW ? (
+          <Field label="reps" value={set.reps} onChange={(v) => onChange({ ...set, reps: v, kg: 0 })} step={1} />
         ) : (
           <>
             <Field label="reps" value={set.reps} onChange={(v) => onChange({ ...set, reps: v })} step={1} />
             <span className="setrow__x">×</span>
-            <Field label="kg" value={set.kg} onChange={(v) => onChange({ ...set, kg: v })} step={2.5} disabled={isBW && set.kg === 0 && false} placeholder={isBW ? '+0' : '0'} />
+            <Field label="kg" value={set.kg} onChange={(v) => onChange({ ...set, kg: v })} step={2.5} placeholder="0" />
           </>
         )}
       </div>

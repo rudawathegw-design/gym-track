@@ -1,7 +1,7 @@
 // data.jsx — exercise library, seed data, progress math. Exported to window.
 
 // Muscle group buckets for the library tabs
-const GROUPS = ['Chest', 'Back', 'Legs', 'Shoulders', 'Arms', 'Core'];
+const GROUPS = ['Chest', 'Back', 'Legs', 'Shoulders', 'Arms', 'Core', 'Cardio'];
 
 // Each exercise: id, name, group, equipment, view, primary[], secondary[],
 // track ('weight'|'bodyweight'), tip
@@ -189,6 +189,32 @@ const EXERCISES = [
     primary: ['abs'], secondary: ['obliques'], track: 'bodyweight',
     tip: 'Plank position, drive knees to chest fast, keep hips low.',
     tip_ku: 'لە دۆخی پلانک، ئەژنۆ بەخێرایی بۆ سنگ ڕابکێشە، کەمەر نزم بهێڵە.' },
+
+  // ---- Cardio (logged in minutes, no weight) ----
+  { id: 'treadmill', name: 'Treadmill Run', name_ku: 'ڕاکردن لەسەر تریدمیل', group: 'Cardio', equipment: 'machine', view: 'front',
+    primary: ['quads'], secondary: ['calves', 'glutes'], track: 'cardio',
+    tip: 'Track total minutes. Keep an easy, steady pace you can sustain.',
+    tip_ku: 'کۆی خولەکەکان تۆمار بکە. هەنگاوێکی هاوسەنگ و ئاسوودە بگرە.' },
+  { id: 'cycling', name: 'Stationary Bike', name_ku: 'پایسکلی جێگیر', group: 'Cardio', equipment: 'machine', view: 'front',
+    primary: ['quads'], secondary: ['hamstrings', 'calves'], track: 'cardio',
+    tip: 'Track minutes. Keep cadence smooth, adjust resistance to effort.',
+    tip_ku: 'خولەکەکان تۆمار بکە. خێرایی نەرم بگرە، بەرگری بگۆڕە بەپێی ماندووبوون.' },
+  { id: 'rowing', name: 'Rowing Machine', name_ku: 'ئامێری سەوڵ لێدان', group: 'Cardio', equipment: 'machine', view: 'back',
+    primary: ['back'], secondary: ['quads', 'biceps'], track: 'cardio',
+    tip: 'Track minutes. Drive with legs first, then pull with the back and arms.',
+    tip_ku: 'خولەکەکان تۆمار بکە. سەرەتا بە قاچ پاڵ بدە، پاشان بە پشت و باسک ڕابکێشە.' },
+  { id: 'elliptical', name: 'Elliptical', name_ku: 'ئیلیپتیکاڵ', group: 'Cardio', equipment: 'machine', view: 'front',
+    primary: ['quads'], secondary: ['glutes', 'hamstrings'], track: 'cardio',
+    tip: 'Track minutes. Smooth full strides, light grip on the handles.',
+    tip_ku: 'خولەکەکان تۆمار بکە. هەنگاوی تەواو و نەرم، دەست سووک لەسەر دەسکەکان.' },
+  { id: 'jump_rope', name: 'Jump Rope', name_ku: 'بازدان بە گوریس', group: 'Cardio', equipment: 'bodyweight', view: 'front',
+    primary: ['calves'], secondary: ['quads'], track: 'cardio',
+    tip: 'Track minutes. Small bounces from the ankles, wrists turn the rope.',
+    tip_ku: 'خولەکەکان تۆمار بکە. بازدانی بچووک لە مەچەک، مەچەکەکان گوریس دەسووڕێنن.' },
+  { id: 'stair_climber', name: 'Stair Climber', name_ku: 'پلیکانە بەرز', group: 'Cardio', equipment: 'machine', view: 'front',
+    primary: ['glutes'], secondary: ['quads', 'calves'], track: 'cardio',
+    tip: 'Track minutes. Stand tall, full steps, don’t lean on the rails.',
+    tip_ku: 'خولەکەکان تۆمار بکە. ڕاست بوەستە، هەنگاوی تەواو، پاڵ مەدە بە لێوارەکان.' },
 ];
 
 const byId = (id) => EXERCISES.find((e) => e.id === id);

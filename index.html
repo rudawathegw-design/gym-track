@@ -103,6 +103,9 @@ input,textarea{font-family:inherit}
 .logcard__id{display:flex;align-items:center;gap:11px;flex:1;text-align:left;min-width:0}
 .logcard__name{font-family:var(--display);font-weight:700;font-size:15px;line-height:1.1}
 .logcard__sub{font-size:11.5px;color:var(--dim);margin-top:2px}
+.logcard__done{width:30px;height:30px;border-radius:9px;border:2px solid var(--line2);background:var(--bg3);display:grid;place-items:center;flex-shrink:0;transition:background .15s,border-color .15s}
+.logcard__done.is-on{background:var(--lime);border-color:var(--lime)}
+.logcard--done{border-color:rgba(var(--lime-rgb),.45);background:linear-gradient(100deg,rgba(var(--lime-rgb),.06),var(--bg2) 60%)}
 .logcard__del{width:28px;height:28px;border-radius:8px;color:var(--mut);font-size:20px;line-height:1;background:var(--bg3)}
 .logcard__del:active{color:var(--danger)}
 .logcard__cols{display:grid;grid-template-columns:34px 1fr 60px;gap:8px;font-size:9.5px;letter-spacing:.1em;color:var(--mut);text-transform:uppercase;padding:0 2px 4px}

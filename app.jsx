@@ -15,6 +15,13 @@ function mondayOf(d) {
   x.setDate(x.getDate() - day); x.setHours(0, 0, 0, 0); return x;
 }
 
+// starter sets for a brand-new exercise entry
+function defaultSets(ex) {
+  if (ex.track === 'cardio') return [{ reps: 20, kg: 0, done: false }];          // 1 × 20 min
+  const reps = ex.track === 'time' ? 30 : 8;                                      // 30s holds, else 8 reps
+  return Array.from({ length: 3 }, () => ({ reps, kg: 0, done: false }));
+}
+
 function useStore() {
   const [state, setState] = useState(() => {
     try { const raw = localStorage.getItem('gymtrack_v1'); if (raw) return JSON.parse(raw); } catch (e) {}
@@ -65,6 +72,7 @@ function App() {
   const [pickerDay, setPickerDay] = useState(null);  // weekday key to edit plan, or 'today'
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [summary, setSummary] = useState(null);
+  const [finishConfirm, setFinishConfirm] = useState(false);
   const [tw, setTweak] = useTweaks({ accent: '#c8ff00' });
   const accent = tw.accent || '#c8ff00';
   window.__accent = accent;
@@ -87,7 +95,7 @@ function App() {
       const last = lastEntryFor(store.history, id);
       const ex = byId(id);
       if (last) entries[id] = last.sets.map((s) => ({ reps: s.reps, kg: s.kg, done: false }));
-      else entries[id] = Array.from({ length: 3 }, () => ({ reps: ex.track === 'time' ? 30 : 8, kg: 0, done: false }));
+      else entries[id] = defaultSets(ex);
     });
     setDraft({ date: ymd(today), weekday: tKey, entries, order: exIds.slice(), note: '' });
   };
@@ -161,12 +169,19 @@ function App() {
     const arr = (d.entries[exId] || []).slice(); arr.splice(idx, 1);
     setDraft({ ...d, entries: { ...d.entries, [exId]: arr } });
   };
+  // toggle ALL sets of an exercise done/undone (the per-exercise check)
+  const toggleExDone = (exId) => {
+    const d = draft; if (!d) return;
+    const arr = d.entries[exId] || [];
+    const makeDone = !(arr.length > 0 && arr.every((s) => s.done));
+    setDraft({ ...d, entries: { ...d.entries, [exId]: arr.map((s) => ({ ...s, done: makeDone })) } });
+  };
   const addExerciseToDraft = (exId) => {
     const d = draft || { date: ymd(today), weekday: tKey, entries: {}, order: [], note: '' };
     if (d.order.includes(exId)) return;
     const ex = byId(exId);
     const last = lastEntryFor(store.history, exId);
-    const sets = last ? last.sets.map((s) => ({ reps: s.reps, kg: s.kg, done: false })) : Array.from({ length: 3 }, () => ({ reps: ex.track === 'time' ? 30 : 8, kg: 0, done: false }));
+    const sets = last ? last.sets.map((s) => ({ reps: s.reps, kg: s.kg, done: false })) : defaultSets(ex);
     setDraft({ ...d, entries: { ...d.entries, [exId]: sets }, order: [...d.order, exId] });
   };
   const removeExerciseFromDraft = (exId) => {
@@ -191,8 +206,8 @@ function App() {
             store={store} draft={draft} tKey={tKey} today={today}
             onStart={() => startDraft(store.plan[tKey] || [])}
             updateSet={updateSet} addSet={addSet} removeSet={removeSet}
-            onFinish={finishWorkout} onAddExercise={() => setPickerDay('today')}
-            onRemoveExercise={removeExerciseFromDraft} openDetail={setDetailEx}
+            onFinish={() => setFinishConfirm(true)} onAddExercise={() => setPickerDay('today')}
+            onRemoveExercise={removeExerciseFromDraft} onToggleExDone={toggleExDone} openDetail={setDetailEx}
             setNote={(n) => setDraft({ ...draft, note: n })}
           />
         )}
@@ -233,6 +248,23 @@ function App() {
       {/* settings */}
       <Sheet open={settingsOpen} onClose={() => setSettingsOpen(false)} title={t('settings_title')}>
         <SettingsPanel store={store} setStore={setStore} setDraft={setDraft} onClose={() => setSettingsOpen(false)} />
+      </Sheet>
+
+      {/* finish confirmation: complete or add more */}
+      <Sheet open={finishConfirm} onClose={() => setFinishConfirm(false)} title={lang === 'ku' ? 'مەشقەکەت تەواوە؟' : 'Finish workout?'}>
+        <div style={{ padding: '4px 2px 8px' }}>
+          <p style={{ fontSize: 13.5, color: 'var(--dim)', lineHeight: 1.55, marginBottom: 16 }}>
+            {lang === 'ku'
+              ? 'هەموو مەشقەکانت کرا. تەواوی بکە و پاشەکەوتی بکە، یان مەشقی زیاتر زیاد بکە.'
+              : 'All exercises are checked off. Save your workout, or add more exercises first.'}
+          </p>
+          <button className="btn btn--primary btn--xl" onClick={() => { setFinishConfirm(false); finishWorkout(); }}>
+            <IconCheck /> {lang === 'ku' ? 'تەواو و پاشەکەوت' : 'Finish & Save'}
+          </button>
+          <button className="btn btn--ghost" style={{ marginTop: 10 }} onClick={() => { setFinishConfirm(false); setPickerDay('today'); }}>
+            {lang === 'ku' ? 'مەشقی زیاتر زیاد بکە' : 'Add more exercises'}
+          </button>
+        </div>
       </Sheet>
 
       {/* finish summary */}
