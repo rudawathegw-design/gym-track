@@ -45,14 +45,20 @@ const cloudSave = (state) => authedFetch("PUT", state);
 
 // ---------- styles for the gate ----------
 const GATE_CSS = `
-.gate{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#000;z-index:100;padding:24px}
-.gate__card{width:100%;max-width:380px;background:#111;border:1px solid #262626;border-radius:22px;padding:30px 24px;text-align:center}
+.gate{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:radial-gradient(120% 80% at 50% -10%, rgba(200,255,0,.10), transparent 60%), #050505;z-index:100;padding:24px;overflow:hidden}
+.gate::before{content:"";position:absolute;width:520px;height:520px;border-radius:50%;background:radial-gradient(circle, rgba(200,255,0,.12), transparent 70%);top:-180px;filter:blur(30px);pointer-events:none}
+.gate__card{position:relative;width:100%;max-width:380px;background:linear-gradient(180deg,#141414,#0e0e0e);border:1px solid #242424;border-radius:26px;padding:36px 26px 30px;text-align:center;box-shadow:0 30px 80px rgba(0,0,0,.6)}
 .gate__logo{width:60px;height:60px;border-radius:18px;background:#c8ff00;display:grid;place-items:center;margin:0 auto 16px}
-.gate__title{font-family:'Archivo',sans-serif;font-weight:900;letter-spacing:.14em;font-size:22px;color:#f6f6f4}
-.gate__sub{font-size:13px;color:#9b9b97;margin:6px 0 22px;line-height:1.5}
-.gate__btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;background:#fff;color:#1f1f1f;font-family:'Archivo',sans-serif;font-weight:700;font-size:15px;border-radius:13px;padding:13px;border:none;cursor:pointer}
-.gate__btn:active{filter:brightness(.96)}
-.gate__err{color:#ff5b5b;font-size:12.5px;margin-top:12px}
+/* hero dumbbell mark for login */
+.gate__hero{width:96px;height:96px;border-radius:28px;background:linear-gradient(145deg,#d4ff33,#a9d400);display:grid;place-items:center;margin:0 auto 22px;box-shadow:0 12px 40px rgba(200,255,0,.32), inset 0 2px 6px rgba(255,255,255,.35)}
+.gate__title{font-family:'Archivo',sans-serif;font-weight:900;letter-spacing:.18em;font-size:30px;color:#f6f6f4;margin-left:.18em}
+.gate__tag{font-family:'Archivo',sans-serif;font-weight:700;font-size:12px;letter-spacing:.22em;text-transform:uppercase;color:#c8ff00;margin-top:8px}
+.gate__sub{font-size:13.5px;color:#9b9b97;margin:14px 0 24px;line-height:1.55}
+.gate__btn{display:flex;align-items:center;justify-content:center;gap:11px;width:100%;background:#fff;color:#1f1f1f;font-family:'Archivo',sans-serif;font-weight:700;font-size:15.5px;border-radius:14px;padding:15px;border:none;cursor:pointer;transition:transform .08s,box-shadow .15s;box-shadow:0 6px 22px rgba(0,0,0,.4)}
+.gate__btn:hover{box-shadow:0 8px 26px rgba(255,255,255,.12)}
+.gate__btn:active{transform:scale(.98);filter:brightness(.96)}
+.gate__foot{font-size:11px;color:#5e5e5a;margin-top:18px;line-height:1.5}
+.gate__err{color:#ff5b5b;font-size:12.5px;margin-top:14px}
 /* sync badge over the app */
 .synbadge{position:fixed;top:10px;left:50%;transform:translateX(-50%);z-index:90;background:rgba(17,17,17,.95);border:1px solid #323232;color:#9b9b97;font-size:11px;font-weight:600;padding:6px 12px;border-radius:20px;display:flex;align-items:center;gap:7px;pointer-events:none;transition:opacity .3s}
 .synbadge__dot{width:7px;height:7px;border-radius:50%;background:#c8ff00}
@@ -70,19 +76,32 @@ function GoogleIcon() {
   );
 }
 
+function DumbbellMark() {
+  // chunky gym dumbbell
+  return (
+    <svg width="54" height="54" viewBox="0 0 64 64" fill="none">
+      <g stroke="#0a0a0a" strokeWidth="4.5" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="3" y="22" width="9" height="20" rx="3" fill="#0a0a0a" stroke="none"/>
+        <rect x="12" y="17" width="9" height="30" rx="3.5" fill="#0a0a0a" stroke="none"/>
+        <rect x="43" y="17" width="9" height="30" rx="3.5" fill="#0a0a0a" stroke="none"/>
+        <rect x="52" y="22" width="9" height="20" rx="3" fill="#0a0a0a" stroke="none"/>
+        <line x1="21" y1="32" x2="43" y2="32"/>
+      </g>
+    </svg>
+  );
+}
+
 function LoginScreen({ onGoogle, error }) {
   return (
     <div className="gate">
       <div className="gate__card">
-        <div className="gate__logo">
-          <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#0a0a0a" strokeWidth="2.4" strokeLinecap="round">
-            <path d="M3 12h2M19 12h2M7 9v6M17 9v6M9 12h6"/>
-          </svg>
-        </div>
+        <div className="gate__hero"><DumbbellMark /></div>
         <div className="gate__title">IRONLOG</div>
-        <div className="gate__sub">Sign in with Google to track your workouts. Your data syncs automatically.</div>
+        <div className="gate__tag">Train · Track · Progress</div>
+        <div className="gate__sub">Log every set, beat your PRs, and sync your workouts automatically — just sign in to begin.</div>
         <button className="gate__btn" onClick={onGoogle}><GoogleIcon /> Continue with Google</button>
         {error && <div className="gate__err">{error}</div>}
+        <div className="gate__foot">Your workouts are saved securely. We only use your Google name & email to identify your account.</div>
       </div>
     </div>
   );

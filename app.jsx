@@ -120,7 +120,25 @@ function App() {
     });
     const vol = sessionVolume(session);
     const totalSets = entries.reduce((t, e) => t + e.sets.length, 0);
-    setStore({ ...store, history: [...store.history, session] });
+    // One session per calendar day: if today already has a session, merge into
+    // it (replace matching exercises, append new ones) so saving again doesn't
+    // create a duplicate that doubles reports/progress.
+    const todayYmd = ymd(today);
+    const existingIdx = store.history.findIndex((s) => ymd(new Date(s.date)) === todayYmd);
+    let history;
+    if (existingIdx >= 0) {
+      const prevSession = store.history[existingIdx];
+      const mergedEntries = prevSession.entries.slice();
+      entries.forEach((ne) => {
+        const i = mergedEntries.findIndex((e) => e.exerciseId === ne.exerciseId);
+        if (i >= 0) mergedEntries[i] = ne; else mergedEntries.push(ne);
+      });
+      history = store.history.slice();
+      history[existingIdx] = { ...prevSession, weekday: tKey, entries: mergedEntries, note: draft.note || prevSession.note || '' };
+    } else {
+      history = [...store.history, session];
+    }
+    setStore({ ...store, history });
     setDraft(null);
     setSummary({ vol, prs, totalSets, exCount: entries.length });
   };
